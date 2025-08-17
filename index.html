@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>I202 Class Schedule — Smart View</title>
+<style>
+  :root {
+    --accent:#2e7d32; /* Dark green */
+    --accent-light:#43a047; /* Lighter green for highlights */
+    --bg:#000;
+    --panel:#111;
+    --panel2:#222;
+    --text:#fff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0;
+    font-family: "Times New Roman", Times, serif;
+    color:var(--text);
+    text-align:center;
+    position: relative;
+    min-height: 100vh;
+    background: url("https://github.com/user-attachments/assets/0b16f830-2d54-42e8-a16e-59770beed2c5") no-repeat center center fixed;
+    background-size: cover;
+  }
+  body::before {
+    content:"";
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    z-index:-1;
+  }
+
+  header {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    background:rgba(73, 94, 53, 0.8);
+    color:#fff;
+    font-weight:700;
+    font-size:20px;
+    padding:14px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.5);
+  }
+  header img { height:40px; width:auto; }
+
+  .controls { 
+    margin: 12px auto; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; 
+  }
+  button {
+    background:var(--accent); color:#fff; border:0; padding:8px 14px; border-radius:8px; font-weight:700; cursor:pointer;
+  }
+  button:hover { filter:brightness(1.1); transform: translateY(-1px); }
+
+  #countdown, #todayBox {
+    margin: 12px auto; max-width: 720px; text-align:left;
+    background: var(--panel); border:2px solid var(--accent); border-radius:12px;
+    box-shadow:0 0 15px rgba(46,125,50,.5); padding:12px 14px;
+  }
+  #countdown { font-size:18px; font-weight:700; }
+
+  .today-item {
+    border:1px solid var(--accent); border-radius:10px; padding:10px; margin:10px 0; background:var(--panel2);
+  }
+  .today-item .when { color: var(--accent-light); font-weight:700; }
+  .today-item .subj { font-weight:700; }
+  .today-item.highlight {
+    background:#d8f3dc; color:#000; box-shadow:0 0 18px var(--accent-light); border-color:#000;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow:0 0 8px var(--accent-light); } 
+    50% { box-shadow:0 0 28px var(--accent-light); } 
+    100% { box-shadow:0 0 8px var(--accent-light); }
+  }
+
+  .schedule-wrapper { display:flex; justify-content:center; margin: 8px; overflow-x:auto; width:100%; }
+  .schedule {
+    display:grid; grid-template-columns: 84px repeat(6, minmax(100px, 1fr));
+    border:2px solid var(--accent); box-shadow:0 0 15px rgba(46,125,50,.6);
+    transform-origin: top center; transition: transform .25s ease;
+    min-width: 700px; width:100%;
+  }
+  .cell {
+    border:1px solid var(--accent); padding:6px; min-height:42px; display:flex; 
+    align-items:center; justify-content:center; background:#111; text-align:center;
+    font-size:clamp(10px, 2.5vw, 14px);
+  }
+  .cell.header { background:var(--accent); color:#fff; font-weight:700; }
+  .cell.time   { background:#1b1b1b; color:var(--accent-light); font-weight:700; }
+  .event { background:#333; color:#fff; border-left:4px solid var(--accent); font-weight:700; line-height:1.2; padding:6px; width:100%; }
+  .event:hover { background:var(--accent); color:#fff; }
+  .event.highlight { background:#d8f3dc !important; color:#000 !important; box-shadow:0 0 16px var(--accent-light); animation: pulse 1.5s infinite; }
+
+  @media (max-width: 768px) {
+    header { font-size:16px; padding:10px; }
+    #countdown { font-size:16px; }
+    .controls { flex-direction:column; align-items:center; }
+    button { width:100%; max-width:300px; }
+    .schedule { font-size:12px; }
+    header img { height:30px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <img src="https://github.com/user-attachments/assets/6b929fa8-f31b-4102-b7be-1629d75be945" alt="Logo">
+    <span>I202 Class Schedule — Live View</span>
+  </header>
+
+  <div class="controls">
+    <button onclick="zoom(0.1)">🔍 Zoom In ➕</button>
+    <button onclick="zoom(-0.1)">🔎 Zoom Out ➖</button>
+  </div>
+
+  <div id="countdown">Loading next class…</div>
+  <div id="todayBox">
+    <strong>Today’s Classes</strong>
+    <div id="todayList" style="margin-top:8px;"></div>
+  </div>
+
+  <!-- Weekly grid -->
+  <div class="schedule-wrapper">
+    <div class="schedule" id="schedule">
+      <!-- headers -->
+      <div class="cell header">Time</div>
+      <div class="cell header">Mon</div>
+      <div class="cell header">Tue</div>
+      <div class="cell header">Wed</div>
+      <div class="cell header">Thu</div>
+      <div class="cell header">Fri</div>
+      <div class="cell header">Sat</div>
+
+      <!-- 7:00-8:00 -->
+      <div class="cell time">7:00–8:00</div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+      <!-- 8:00-9:00 -->
+      <div class="cell time">8:00–9:00</div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+      <!-- 9:00-10:00 -->
+      <div class="cell time">9:00–10:00</div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+      <!-- 10:00-11:00 -->
+      <div class="cell time">10:00–11:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="10:00" data-end="11:00"
+           data-subject="7WEB1" data-prof="Austria, Marc Ed Joseph" data-room="L307">
+        7WEB1<br>Austria, Marc Ed Joseph<br>L307
+      </div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell"></div> <!-- Removed Fri 10–11 7WEB1 -->
+      <div class="cell"></div>
+
+      <!-- 11:00-12:00 -->
+      <div class="cell time">11:00–12:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="11:00" data-end="12:00"
+           data-subject="7WEB1" data-prof="Austria, Marc Ed Joseph" data-room="L307">
+        7WEB1<br>Austria, Marc Ed Joseph<br>L307
+      </div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell"></div> <!-- Removed Fri 11–12 7WEB1 -->
+      <div class="cell"></div>
+
+      <!-- 12:00-1:00 -->
+      <div class="cell time">12:00–1:00</div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+           <!-- 1:00-2:00 -->
+      <div class="cell time">1:00–2:00</div>
+      <div class="cell"></div><div class="cell"></div>
+      <div class="cell event"
+           data-day="Wed" data-start="13:00" data-end="14:00"
+           data-subject="PATHFIT3" data-prof="Guevarra, Jhunboy" data-room="GYM">
+        PATHFIT3<br>Guevarra, Jhunboy<br>GYM
+      </div>
+      <div class="cell"></div>
+      <div class="cell event"
+           data-day="Fri" data-start="13:00" data-end="14:00"
+           data-subject="7WEB1" data-prof="Austria, Marc Ed Joseph" data-room="CLAB2">
+        7WEB1<br>Austria, Marc Ed Joseph<br>CLAB2
+      </div>
+      <div class="cell"></div>
+
+      <!-- 2:00-3:00 -->
+      <div class="cell time">2:00–3:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="14:00" data-end="15:00"
+           data-subject="CONTWORLD" data-prof="Villacorte, Jonie" data-room="L309">
+        CONTWORLD<br>Villacorte, Jonie<br>L309
+      </div>
+      <div class="cell"></div>
+      <div class="cell event"
+           data-day="Wed" data-start="14:00" data-end="15:00"
+           data-subject="PATHFIT3" data-prof="Guevarra, Jhunboy" data-room="GYM">
+        PATHFIT3<br>Guevarra, Jhunboy<br>GYM
+      </div>
+      <div class="cell"></div>
+      <div class="cell event"
+           data-day="Fri" data-start="14:00" data-end="15:00"
+           data-subject="7WEB1" data-prof="Austria, Marc Ed Joseph" data-room="CLAB2">
+        7WEB1<br>Austria, Marc Ed Joseph<br>CLAB2
+      </div>
+      <div class="cell event"
+           data-day="Sat" data-start="14:00" data-end="15:00"
+           data-subject="7AFSYS" data-prof="AFSYS Prof" data-room="L310">
+        7AFSYS<br>AFSYS Prof<br>L310
+      </div>
+
+      <!-- 3:00-4:00 -->
+      <div class="cell time">3:00–4:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="15:00" data-end="16:00"
+           data-subject="CONTWORLD" data-prof="Villacorte, Jonie" data-room="L309">
+        CONTWORLD<br>Villacorte, Jonie<br>L309
+      </div>
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <div class="cell event"
+           data-day="Fri" data-start="15:00" data-end="16:00"
+           data-subject="7WEB1" data-prof="Austria, Marc Ed Joseph" data-room="CLAB2">
+        7WEB1<br>Austria, Marc Ed Joseph<br>CLAB2
+      </div>
+      <div class="cell event"
+           data-day="Sat" data-start="15:00" data-end="16:00"
+           data-subject="7AFSYS" data-prof="AFSYS Prof" data-room="L310">
+        7AFSYS<br>AFSYS Prof<br>L310
+      </div>
+
+
+      <!-- 4:00-5:00 -->
+      <div class="cell time">4:00–5:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="16:00" data-end="17:00"
+           data-subject="CONTWORLD" data-prof="Villacorte, Jonie" data-room="L309">
+        CONTWORLD<br>Villacorte, Jonie<br>L309
+      </div>
+      <div class="cell"></div><div class="cell"></div>
+      <div class="cell event"
+           data-day="Thu" data-start="16:00" data-end="17:00"
+           data-subject="6DATAS" data-prof="Galang, Deborah" data-room="L302">
+        6DATAS<br>Galang, Deborah<br>L302
+      </div>
+      <div class="cell event"
+           data-day="Fri" data-start="16:00" data-end="17:00"
+           data-subject="CCARES" data-prof="" data-room="L309">
+        CCARES<br>L309
+      </div>
+      <div class="cell event"
+           data-day="Sat" data-start="16:00" data-end="17:00"
+           data-subject="7AFSYS" data-prof="AFSYS Prof" data-room="L310">
+        7AFSYS<br>AFSYS Prof<br>L310
+      </div>
+      
+       <!-- 5:00-6:00 -->
+      <div class="cell time">5:00–6:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="17:00" data-end="18:00"
+           data-subject="7HCOMINT" data-prof="Milarpis, Carla" data-room="Asynchronous">
+        7HCOMINT<br>Milarpis, Carla<br>Asynchronous
+      </div>
+      <div class="cell event"
+           data-day="Tue" data-start="17:00" data-end="18:00"
+           data-subject="7BUSPRO" data-prof="Umali, Barbara" data-room="L304">
+        7BUSPRO<br>Umali, Barbara<br>L304
+      </div>
+      <div class="cell"></div>
+      <div class="cell event"
+           data-day="Thu" data-start="17:00" data-end="18:00"
+           data-subject="6DATAS" data-prof="Galang, Deborah" data-room="L302">
+        6DATAS<br>Galang, Deborah<br>L302
+      </div>
+      <div class="cell"></div><div class="cell"></div>
+
+            <!-- 6:00-7:00 -->
+      <div class="cell time">6:00–7:00</div>
+      <div class="cell event"
+           data-day="Mon" data-start="18:00" data-end="19:00"
+           data-subject="7HCOMINT" data-prof="Milarpis, Carla" data-room="Asynchronous">
+        7HCOMINT<br>Milarpis, Carla<br>Asynchronous
+      </div>
+      <div class="cell event"
+           data-day="Tue" data-start="18:00" data-end="19:00"
+           data-subject="7BUSPRO" data-prof="Umali, Barbara" data-room="L304">
+        7BUSPRO<br>Umali, Barbara<br>L304
+      </div>
+      <div class="cell event"
+           data-day="Wed" data-start="18:00" data-end="19:00"
+           data-subject="7QUANTI" data-prof="Pineda, Jayson Lester" data-room="L306">
+        7QUANTI<br>Pineda, Jayson Lester<br>L306
+      </div>
+      <div class="cell event"
+           data-day="Thu" data-start="18:00" data-end="19:00"
+           data-subject="6DATAS" data-prof="Galang, Deborah" data-room="CLAB7">
+        6DATAS<br>Galang, Deborah<br>CLAB7
+      </div>
+      <div class="cell event"
+           data-day="Fri" data-start="18:00" data-end="19:00"
+           data-subject="7HCOMINT" data-prof="Milarpis, Carla" data-room="CLAB2">
+        7HCOMINT<br>Milarpis, Carla<br>CLAB2
+      </div>
+      <div class="cell"></div>
+
+      <!-- 7:00-8:00 -->
+      <div class="cell time">7:00–8:00</div>
+      <div class="cell"></div>
+      <div class="cell event"
+           data-day="Tue" data-start="19:00" data-end="20:00"
+           data-subject="7BUSPRO" data-prof="Umali, Barbara" data-room="L304">
+        7BUSPRO<br>Umali, Barbara<br>L304
+      </div>
+      <div class="cell event"
+           data-day="Wed" data-start="19:00" data-end="20:00"
+           data-subject="7QUANTI" data-prof="Pineda, Jayson Lester" data-room="L306">
+        7QUANTI<br>Pineda, Jayson Lester<br>L306
+      </div>
+      <div class="cell event"
+           data-day="Thu" data-start="19:00" data-end="20:00"
+           data-subject="6DATAS" data-prof="Galang, Deborah" data-room="CLAB7">
+        6DATAS<br>Galang, Deborah<br>CLAB7
+      </div>
+      <div class="cell event"
+           data-day="Fri" data-start="19:00" data-end="20:00"
+           data-subject="7HCOMINT" data-prof="Milarpis, Carla" data-room="CLAB2">
+        7HCOMINT<br>Milarpis, Carla<br>CLAB2
+      </div>
+      <div class="cell"></div>
+
+      <!-- 8:00-9:00 -->
+      <div class="cell time">8:00–9:00</div>
+      <div class="cell"></div><div class="cell"></div>
+      <div class="cell event"
+           data-day="Wed" data-start="20:00" data-end="21:00"
+           data-subject="7QUANTI" data-prof="Pineda, Jayson Lester" data-room="L306">
+        7QUANTI<br>Pineda, Jayson Lester<br>L306
+      </div>
+      <div class="cell event"
+           data-day="Thu" data-start="20:00" data-end="21:00"
+           data-subject="6DATAS" data-prof="Galang, Deborah" data-room="CLAB7">
+        6DATAS<br>Galang, Deborah<br>CLAB7
+      </div>
+      <div class="cell event"
+           data-day="Fri" data-start="20:00" data-end="21:00"
+           data-subject="7HCOMINT" data-prof="Milarpis, Carla" data-room="CLAB2">
+        7HCOMINT<br>Milarpis, Carla<br>CLAB2
+      </div>
+      <div class="cell"></div>
+
+      </div>
+    </div>
+
+<script>
+  let zoomLevel = 1;
+  function zoom(delta){ 
+    zoomLevel = Math.max(0.5, zoomLevel + delta); 
+    document.getElementById('schedule').style.transform = `scale(${zoomLevel})`; 
+  }
+
+  const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const toMins = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const fmt12  = t => {
+    let [h,m] = t.split(':').map(Number);
+    const ampm = h>=12 ? 'PM' : 'AM';
+    h = ((h+11)%12)+1;
+    return `${h}:${m.toString().padStart(2,'0')} ${ampm}`;
+  };
+
+  function readEvents() {
+    const evs = [];
+    document.querySelectorAll('.event').forEach(el=>{
+      evs.push({
+        el,
+        day: el.dataset.day,
+        start: el.dataset.start,
+        end: el.dataset.end,
+        subj: el.dataset.subject,
+        prof: el.dataset.prof || "",
+        room: el.dataset.room || ""
+      });
+    });
+    return evs;
+  }
+
+  function eventsForToday(all) {
+    const today = dayNames[new Date().getDay()];
+    return all.filter(e=>e.day===today)
+              .sort((a,b)=>toMins(a.start)-toMins(b.start));
+  }
+
+  function mergeContiguous(list) {
+    if(!list.length) return [];
+    const out = [];
+    let cur = {...list[0]};
+    for(let i=1;i<list.length;i++){
+      const n = list[i];
+      if(n.subj===cur.subj && n.prof===cur.prof && n.room===cur.room && toMins(n.start)===toMins(cur.end)){
+        cur.end = n.end;
+      } else {
+        out.push(cur);
+        cur = {...n};
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function renderToday(list){
+    const box = document.getElementById('todayList');
+    box.innerHTML = "";
+    list.forEach(item=>{
+      const div = document.createElement('div');
+      div.className = 'today-item';
+      div.dataset.start=item.start; div.dataset.end=item.end;
+      div.innerHTML = `
+        <div class="when">${fmt12(item.start)} – ${fmt12(item.end)}</div>
+        <div class="subj">${item.subj}</div>
+        <div>${item.prof || ""}</div>
+        <div>${item.room ? 'Room: '+item.room : ''}</div>
+      `;
+      box.appendChild(div);
+    });
+    if(!list.length){
+      box.innerHTML = `<div class="today-item">No classes today.</div>`;
+    }
+  }
+
+  function findOngoing(list, nowMins){
+    return list.find(e => nowMins >= toMins(e.start) && nowMins < toMins(e.end));
+  }
+  function findUpcoming(list, nowMins){
+    return list.find(e => toMins(e.start) > nowMins);
+  }
+
+  function highlightSync(todaySlots, ongoing){
+    document.querySelectorAll('.event').forEach(el=>el.classList.remove('highlight'));
+    document.querySelectorAll('.today-item').forEach(el=>el.classList.remove('highlight'));
+    if(!ongoing) return;
+    ongoing.el.classList.add('highlight');
+    const card = Array.from(document.querySelectorAll('.today-item'))
+      .find(div => div.dataset.start===ongoing.start && div.dataset.end===ongoing.end);
+    if(card) card.classList.add('highlight');
+  }
+
+  function runClock(){
+    const all = readEvents();
+    const today = eventsForToday(all);
+    const merged = mergeContiguous(today);
+    renderToday(merged);
+
+    function tick(){
+      const now = new Date();
+      const nowMins = now.getHours()*60 + now.getMinutes();
+      const countdown = document.getElementById('countdown');
+
+      const ongoing = findOngoing(today, nowMins);
+      const upcoming = findUpcoming(merged, nowMins);
+
+      if(ongoing){
+        const end = toMins(ongoing.end);
+        const diffMs = (end - nowMins)*60*1000 - (now.getSeconds()*1000 + now.getMilliseconds());
+        const hrs = Math.max(0, Math.floor(diffMs/3600000));
+        const mins= Math.max(0, Math.floor((diffMs%3600000)/60000));
+        const secs= Math.max(0, Math.floor((diffMs%60000)/1000));
+        countdown.textContent = `Ongoing: ${ongoing.subj} — ends in ${hrs}h ${mins}m ${secs}s (until ${fmt12(ongoing.end)})`;
+      } else if(upcoming){
+        const start = toMins(upcoming.start);
+        const diffMs = (start - nowMins)*60*1000 - (now.getSeconds()*1000 + now.getMilliseconds());
+        const hrs = Math.max(0, Math.floor(diffMs/3600000));
+        const mins= Math.max(0, Math.floor((diffMs%3600000)/60000));
+        const secs= Math.max(0, Math.floor((diffMs%60000)/1000));
+        countdown.textContent = `Next: ${upcoming.subj} at ${fmt12(upcoming.start)} — in ${hrs}h ${mins}m ${secs}s`;
+      } else {
+        countdown.textContent = "You can now rest or do other things if you have.";
+      }
+
+      highlightSync(today, ongoing || null);
+    }
+    tick();
+    setInterval(tick, 1000);
+  }
+
+  runClock();
+</script>
+</body>
+</html>
+
